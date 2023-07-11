@@ -24,9 +24,6 @@ you do not need to specify a profile on the command line.\
               \nTo get a list of all profiles, run aws configure list-profiles' % profile_name)
         sys.exit(1)
     
-    
-    
-    
     client = boto3.client('logs')
     response = client.describe_log_groups()
     logGroups = response['logGroups']
@@ -34,31 +31,16 @@ you do not need to specify a profile on the command line.\
         output = []
         filters = []
         for logGroup in logGroups:
-            # print(logGroup['logGroupName'])
-            paginator = client.get_paginator('describe_subscription_filters')
             filter_matches = False
-            for response in paginator.paginate(logGroupName=logGroup['logGroupName']):
-                #while filter_matches == False:          
+            paginator = client.get_paginator('describe_subscription_filters')
+            for response in paginator.paginate(logGroupName=logGroup['logGroupName']):       
                 for filter in response['subscriptionFilters']:
                     if filter['destinationArn'] == args.expected_destination:
                         filter_matches = True
             if filter_matches == False:
                 print("%s did not have the correct destinationArn" % logGroup['logGroupName'])
             else:
-                print('%s had the correct destinationArn' % logGroup['logGroupName'])
-                            #print('%s, %s, %s' % (filter['logGroupName'],filter['filterName'],filter['destinationArn']))
-                        # filters.append(
-                        #     {
-                        #         'logGroupName': filter['logGroupName'],
-                        #         'filterName': filter['filterName'],
-                        #         'filterDestination': filter['destinationArn']
-                        #     }
-                        # )
-                # print('%s %s %s' % (response['filterName'], response['logGroupName'], response['destinationArn']))
-                # filterName = response['subscriptionFilters']['filterName']
-        # for filter in filters:
-        #     print(filter)
-                    
+                print('%s has the correct destinationArn' % logGroup['logGroupName'])
     else:
         
         output = []
