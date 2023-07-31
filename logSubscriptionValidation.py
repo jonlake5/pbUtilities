@@ -5,13 +5,14 @@ import sys
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Validate Log Subscriptions for an Account')
-    parser.add_argument('-p','--profile_name',required=False, type=str)
-    parser.add_argument('-f','--expected_destination',required=False, type=str)
+    parser = argparse.ArgumentParser(
+        description='Validate Log Subscriptions for an Account')
+    parser.add_argument('-p', '--profile_name', required=False, type=str)
+    parser.add_argument('-f', '--expected_destination',
+                        required=False, type=str)
     args = parser.parse_args()
 
-    
-    ## The profile 'default' is used if you don't specify a profile on the command line
+    # The profile 'default' is used if you don't specify a profile on the command line
     profile_name = 'default'
     if args.profile_name:
         profile_name = args.profile_name
@@ -23,7 +24,7 @@ if __name__ == '__main__':
 you do not need to specify a profile on the command line.\
               \nTo get a list of all profiles, run aws configure list-profiles' % profile_name)
         sys.exit(1)
-    
+
     client = boto3.client('logs')
     response = client.describe_log_groups()
     logGroups = response['logGroups']
@@ -33,16 +34,18 @@ you do not need to specify a profile on the command line.\
         for logGroup in logGroups:
             filter_matches = False
             paginator = client.get_paginator('describe_subscription_filters')
-            for response in paginator.paginate(logGroupName=logGroup['logGroupName']):       
+            for response in paginator.paginate(logGroupName=logGroup['logGroupName']):
                 for filter in response['subscriptionFilters']:
                     if filter['destinationArn'] == args.expected_destination:
                         filter_matches = True
             if filter_matches == False:
-                print("%s did not have the correct destinationArn" % logGroup['logGroupName'])
+                print("%s did not have the correct destinationArn" %
+                      logGroup['logGroupName'])
             else:
-                print('%s has the correct destinationArn' % logGroup['logGroupName'])
+                print('%s has the correct destinationArn' %
+                      logGroup['logGroupName'])
     else:
-        
+
         output = []
         filters = []
         for logGroup in logGroups:
@@ -50,8 +53,9 @@ you do not need to specify a profile on the command line.\
             paginator = client.get_paginator('describe_subscription_filters')
             for response in paginator.paginate(logGroupName=logGroup['logGroupName']):
                 for filter in response['subscriptionFilters']:
-                    
-                    print('%s, %s, %s' % (filter['logGroupName'],filter['filterName'],filter['destinationArn']))
+
+                    print('%s, %s, %s' % (
+                        filter['logGroupName'], filter['filterName'], filter['destinationArn']))
                     filters.append(
                         {
                             'logGroupName': filter['logGroupName'],
@@ -63,4 +67,3 @@ you do not need to specify a profile on the command line.\
                 # filterName = response['subscriptionFilters']['filterName']
         for filter in filters:
             print(filter)
-        
