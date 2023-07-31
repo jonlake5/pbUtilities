@@ -40,10 +40,14 @@ you do not need to specify a profile on the command line.\
               \nTo get a list of all profiles, run aws configure list-profiles' % profile_name)
         sys.exit(1)
 
-    nextToken = None
+    nextToken = ''
     output = []
     client = boto3.client('organizations')
     response = client.list_accounts()
-    output = [{'Id': accounts['Id'], 'Name': accounts['Name']}
+    output = output +  [{'Id': accounts['Id'], 'Name': accounts['Name']}
               for accounts in response['Accounts']]
+    while 'NextToken' in response.keys():
+        response = client.list_accounts(NextToken = response['NextToken'])
+        output = output +  [{'Id': accounts['Id'], 'Name': accounts['Name']}
+            for accounts in response['Accounts']]
     writeFile(output, args.output_file, args.output_type)
