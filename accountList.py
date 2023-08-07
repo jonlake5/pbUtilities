@@ -7,12 +7,14 @@ import sys
 
 
 def writeFile(input, outFile, type):
-    match type:
-        case "json":
-            with open(outFile, 'w') as f:
+
+    with open(outFile, 'w',  newline='') as f:
+        match type:
+            case "json":
+                #with open(outFile, 'w') as f:
                 f.write(json.dumps(input))
-        case "csv":
-            with open (outFile, 'w') as f:
+            case "csv":
+                #with open (outFile, 'w') as f:
                 writer = csv.DictWriter(f,fieldnames = (input[0].keys()))
                 writer.writerows(input)
 
