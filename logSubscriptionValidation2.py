@@ -75,3 +75,8 @@ you do not need to specify a profile on the command line.\
     # print(logGroupFilters)
     with (open('./logSubscription.json', 'w') as fh):
         fh.write(json.dumps(allObject))
+
+
+# To Dynamo table in log archive account
+# Excel sheet emailed
+# composite key

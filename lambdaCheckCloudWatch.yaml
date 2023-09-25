@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  LambdaFunctionName: 
+    Type: String
+    Default: LambdaCheckLogSubscription
+
+Description: <your stack description here>
+
+
+Resources:
+  LambdaCheckLogGroup:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Lambda checks that log groups have subscription filter to send to central log solution
+      FunctionName:  !Ref LambdaFunctionName
+      Role: !GetAtt RoleAllowLambdaCheckLogGroup.Arn
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Timeout: 60
+      Code: 
+        ZipFile: |
+          import boto3
+          import json
+          def getLogGroupMappings(aws_account_id):
+              client = boto3.client('logs')
+              response = client.describe_log_groups()
+              logGroups = response['logGroups']
+              logGroupsOutput = []
+              filters = []
+              for logGroup in logGroups:
+                  logGroupObject = {
+                      'logGroupName': logGroup['logGroupName'],
+                      'account': aws_account_id
+                  }
+                  paginator = client.get_paginator('describe_subscription_filters')
+                  for response in paginator.paginate(logGroupName=logGroup['logGroupName']):
+                      filters = []
+                      if len(response['subscriptionFilters']) == 0:
+                          logGroupObject['subscriptionFilters'] = filters
+                          logGroupsOutput.append(logGroupObject)
+                          next
+                      else:
+                          for filter in response['subscriptionFilters']:
+                              # print(filter['filterName'])
+                              lambdaExists = False
+                              if 'lambda' in filter['destinationArn']:
+                                  lambdaExists = checkLambdaFunction(
+                                      filter['destinationArn'])
+                                  # print(lambdaExists)
+                              filterObject = {
+                                  'filterName': filter['filterName'],
+                                  'filterDestination': filter['destinationArn'],
+                                  'lambdaExists': lambdaExists
+                              }
+                              filters.append(filterObject)
+                          logGroupObject['subscriptionFilters'] = filters
+                          logGroupsOutput.append(logGroupObject)
+              return logGroupsOutput
+
+          def checkLambdaFunction(lambdaArn):
+              client = boto3.client('lambda')
+              try:
+                  response = client.get_function(FunctionName=lambdaArn)
+                  return True
+              except:
+                  return False
+          def lambda_handler(event, context):
+              aws_account_id = context.invoked_function_arn.split(":")[4]
+              logGroupFilters = getLogGroupMappings(aws_account_id)
+              allObject = {'logGroups': logGroupFilters}
+              print(json.dumps(allObject))
+              # TODO implement
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Hello from Lambda!')
+              }
+
+  PolicyAllowLambdaCheckLogGroup:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowLambdaCheckLogGroup
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: logs:CreateLogGroup
+            Resource: !Sub 'arn:aws:logs:us-east-1:${AWS::AccountId}:*'
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: 
+              - !Join
+                - ''
+                - - 'arn:aws:logs:us-east-1:'
+                  - !Ref AWS::AccountId
+                  - ':log-group:/aws/lambda/'
+                  - !Ref LambdaFunctionName
+                  - ':*'
+          - Effect: Allow
+            Action:
+              - 'lambda:GetFunction'
+            Resource: !Sub 'arn:aws:lambda:us-east-1:${AWS::AccountId}:function:*'
+          - Effect: Allow
+            Action:
+              - logs:DescribeSubscriptionFilters
+              - logs:DescribeLogGroups
+            Resource:
+              - !Sub 'arn:aws:logs:us-east-1:${AWS::AccountId}:log-group:*'
+  RoleAllowLambdaCheckLogGroup:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - !Ref PolicyAllowLambdaCheckLogGroup
+  RuleInvokeLambdaWeekly:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: WeeklyLambdaCheckLogSubscription
+      ScheduleExpression: "rate(7 days)"
+      Targets:
+        - Id: WeeklyRunLambdaCheckLogSubscription
+          Arn: !GetAtt LambdaCheckLogGroup.Arn
+  LambdaPermissionEventsInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaCheckLogGroup
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt RuleInvokeLambdaWeekly.Arn
